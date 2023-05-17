@@ -1,7 +1,10 @@
 package services;
 
+import helper.DBTablePrinter;
 import models.User;
 import org.sqlite.SQLiteDataSource;
+
+import java.io.File;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -12,9 +15,40 @@ public class Database {
     private String tableName;
     private SQLiteDataSource ds;
 
+    private String dbUrl;
+
     public Database(String dbName) {
         this.dbName = dbName;
         this.ds = null;
+        this.dbUrl = "";
+    }
+
+    public void setTableName(String tableName) {
+        this.tableName = tableName;
+    }
+
+    public void setDs(SQLiteDataSource ds) {
+        this.ds = ds;
+    }
+
+    public void setDbUrl(String dbUrl) {
+        this.dbUrl = dbUrl;
+    }
+
+    public String getDbName() {
+        return dbName;
+    }
+
+    public String getTableName() {
+        return tableName;
+    }
+
+    public SQLiteDataSource getDs() {
+        return ds;
+    }
+
+    public String getDbUrl() {
+        return dbUrl;
     }
 
     public void initialize(){
@@ -25,102 +59,104 @@ public class Database {
                 throw new SQLException("DB name cant' be empty");
             }
             ds = new SQLiteDataSource();
-            ds.setUrl(String.format("jdbc:sqlite:%s.db",this.dbName));
+            var url = this.getDbUrl();
+            if (url.isBlank()){
+                url = String.format("jdbc:sqlite:%s.db",this.getDbName());
+            }
+            ds.setUrl(url);
 
-            System.out.println( "Opened database successfully");
+            System.out.println("Opened database successfully");
 
-        } catch ( SQLException e ) {
+        } catch (SQLException e) {
 
             System.out.println("Error occurred: " + e.getMessage());
-            System.exit( 0 );
+            System.exit(0);
         }
+
     }
 
-    public void setSchemaName(String tableName){
+    public boolean deleteDb(){
+        File db = new File(this.getDbUrl());
+        return db.delete();
+    }
+
+        public void setSchema(String tableName){
 
         try{
+
             if (tableName.isBlank()){
                 throw new SQLException("Table name can't be empty");
             }
-            this.tableName = tableName;
+            this.setTableName(tableName);
 
         } catch (SQLException e) {
             System.out.println("Error occurred: " + e.getMessage());
             System.exit(0);
+
         }
     }
-    public void createSchema(){
+    public String createSchema(){
 
-        String query = "CREATE TABLE IF NOT EXISTS " + this.tableName + " ( " +
+        String query = "CREATE TABLE IF NOT EXISTS " + this.getTableName() + " ( " +
                 "USER_ID INTEGER NOT NULL UNIQUE, " +
                 "USER_GUID TEXT PRIMARY KEY," +
                 "USER_NAME TEXT NOT NULL )";
 
-        this.query(query, "update");
+        return this.executeQuery(query, "update");
 
     }
 
-    public void printAll(){
+    public String printAll(){
 
         System.out.println("\nAttempting to print all records...");
-        var query = "SELECT * FROM " + this.tableName;
-        this.query(query, "get");
+        var query = "SELECT * FROM " + this.getTableName();
+        return this.executeQuery(query, "get");
 
     }
 
-    public void add(User user){
+    public String add(User user){
 
-        System.out.println( "\nAttempting to insert records..." );
+        System.out.println("\nAttempting to insert records...");
         var values = "'" + user.getUserId() + "', '" + user.getUserGuid() + "', '" + user.getUserName() + "'";
-        String query = "INSERT INTO " + this.tableName + " (USER_ID, USER_GUID, USER_NAME) VALUES ( " + values + " )";
-        this.query(query, "update");
+        String query = "INSERT INTO " + this.getTableName() + " (USER_ID, USER_GUID, USER_NAME) VALUES ( " + values + " )";
+        return this.executeQuery(query, "update");
 
     }
 
-    public void deleteAll() {
+    public String deleteAll() {
 
         System.out.println("\nAttempting to delete records...");
-        String query = "DELETE FROM " + this.tableName;
-        this.query(query, "update");
+        String query = "DELETE FROM " + this.getTableName();
+        return this.executeQuery(query, "update");
 
     }
 
-    public void query(String query, String action){
+    public String executeQuery(String query, String action){
 
         try {
-
             Connection conn = ds.getConnection();
             Statement stmt = conn.createStatement();
-            if (action.equals("update")){
 
-                stmt.executeUpdate( query );
+            if (action.equals("update")){
+                stmt.executeUpdate(query);
 
             } else if (action.equals("get")){
-
                 ResultSet rs = stmt.executeQuery(query);
-                if (!rs.isBeforeFirst() ) {
-                    System.out.println("No records found");
-                }
-                while ( rs.next() ) {
-                    int id = rs.getInt( "USER_ID" );
-                    String guid = rs.getString( "USER_GUID" );
-                    String name = rs.getString( "USER_NAME" );
-
-                    System.out.println( "USER_ID = " + id );
-                    System.out.println( "USER_GUID = " + guid );
-                    System.out.println( "USER_NAME = " + name + "\n" );
-                }
+                DBTablePrinter.printResultSet(rs);
             }
+
             else {
                 throw new SQLException("Query Error occurred");
             }
 
-            System.out.println( "Query '" + query + "' done successfully.");
+            System.out.println("Query '" + query + "' done successfully.");
             stmt.close();
             conn.close();
+            return "Success";
 
-        } catch ( SQLException e ) {
+        } catch (SQLException e) {
             System.out.println("Error occurred: " + e.getMessage());
+            return "Error " + e.getMessage();
         }
     }
 

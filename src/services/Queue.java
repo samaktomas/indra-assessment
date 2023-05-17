@@ -14,7 +14,7 @@ public class Queue {
     }
 
     public void createSchema(String tableName){
-        this.db.setSchemaName(tableName);
+        this.db.setSchema(tableName);
         this.executor.submit(new QueueAction(null, "createSchema", this.db));
     }
 
